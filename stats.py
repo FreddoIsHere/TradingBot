@@ -11,15 +11,19 @@ ti = TechIndicators(key, output_format='pandas')
 fd = FundamentalData(key, output_format='pandas')
 
 
-def get_daily_data(ticker):
+def get_daily_data(ticker): # 4 calls
     stock, meta_data = ts.get_daily(ticker, outputsize='compact')
-    closing_vals = stock['4. close']
-    moving_avg = closing_vals.rolling(window=7, min_periods=1).mean()
-    returns = closing_vals / closing_vals.shift(1) - 1
-    volume = stock['5. volume']
-    return pd.concat([moving_avg, returns, volume], keys=['Avg', 'Returns', 'Volume'], axis=1)[1:]
+    intra_day_variation_pos = stock['2. high'] / stock['4. close'] - 1
+    intra_day_variation_pos.columns = ['Var_pos']
+    intra_day_variation_neg = stock['3. low'] / stock['4. close'] - 1
+    intra_day_variation_neg.columns = ['Var_neg']
+    returns = stock['4. close'] / stock['4. close'].shift(1) - 1
+    returns.columns = ['Returns']
+    bbands, _ = ti.get_bbands(ticker, interval='daily', time_period=7, series_type='close')  # volatility
+    rsi, _ = ti.get_rsi(ticker, interval='daily', time_period=7, series_type='close') # momentum
+    obv, _ = ti.get_obv(ticker, interval='daily') # volume
+    df = pd.concat([bbands.head(100).iloc[::-1], returns, intra_day_variation_pos, intra_day_variation_neg, rsi.tail(100).iloc[::-1], obv.tail(100).iloc[::-1]], axis=1)[:-1]
+    df.columns = ['UBB', 'MBB', 'LBB', 'Return', 'Pos_var', 'Neg_var', 'RSI', 'OBV']
+    return df
 
-def get_quarterly_data(ticker):
-    stock, meta_data = sp.get_sector
-
-print(fd.get_income_statement('MSFT')[0])
+print(get_daily_data('MSFT'))

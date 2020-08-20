@@ -13,6 +13,39 @@ def format_income_statement(func):
     return _format_wrapper
 
 
+def format_balance_sheet(func):
+    @wraps(func)
+    def _format_wrapper(self, *args, **kwargs):
+        call_response, data_key, meta_data_key = func(
+            self, *args)
+
+        return call_response, None
+
+    return _format_wrapper
+
+
+def format_cash_flow(func):
+    @wraps(func)
+    def _format_wrapper(self, *args, **kwargs):
+        call_response, data_key, meta_data_key = func(
+            self, *args)
+
+        return call_response, None
+
+    return _format_wrapper
+
+
+def format_company_overview(func):
+    @wraps(func)
+    def _format_wrapper(self, *args, **kwargs):
+        call_response, data_key, meta_data_key = func(
+            self, *args)
+
+        return call_response, None
+
+    return _format_wrapper
+
+
 class FundamentalData(av):
 
     @format_income_statement
@@ -23,18 +56,18 @@ class FundamentalData(av):
 
     @format
     @av._call_api_on_func
-    def get_income_statement(self, symbol):
+    def get_balance_sheet(self, symbol):
         _FUNCTION_KEY = "BALANCE_SHEET"
         return _FUNCTION_KEY, 'BALANCE_SHEET', 'Meta Data'
 
     @format
     @av._call_api_on_func
-    def get_income_statement(self, symbol):
+    def get_cash_flow(self, symbol):
         _FUNCTION_KEY = "CASH_FLOW"
         return _FUNCTION_KEY, 'CASH_FLOW', 'Meta Data'
 
     @format
     @av._call_api_on_func
     def get_company_overview(self, symbol):
-        _FUNCTION_KEY = "CASH_FLOW"
-        return _FUNCTION_KEY, 'CASH_FLOW', 'Meta Data'
+        _FUNCTION_KEY = "OVERVIEW"
+        return _FUNCTION_KEY, 'OVERVIEW', 'Meta Data'
