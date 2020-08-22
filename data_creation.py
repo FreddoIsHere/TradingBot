@@ -1,7 +1,9 @@
+from tqdm import tqdm
+from stats import get_daily_data, scale_data
+from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from stats import get_daily_data
+import torch
 import time
 import sys
 import os
@@ -16,14 +18,17 @@ class DataCreator:
     def provide_training_stock(self):
         stock = pd.read_pickle(self.path + '/stocks')
         signals = pd.read_pickle(self.path + '/signals')
-        return stock, signals
+        train_X = torch.from_numpy(stock.values)
+        train_Y = torch.from_numpy(signals.values)
+        train_set = TensorDataset(train_X, train_Y)
+        return DataLoader(train_set, shuffle=False, batch_size=16)
 
     def create_data(self, tickers):
         for t in tickers:
             start_time = time.time()
             stock = get_daily_data(t, False)
             signals = self.create_labels(stock)
-            stock.to_pickle(self.path + '/stocks')
+            scale_data(stock).to_pickle(self.path + '/stocks')
             signals.to_pickle(self.path + '/signals')
             elapsed_time = time.time()
             time_to_sleep = int(61 - (elapsed_time - start_time))

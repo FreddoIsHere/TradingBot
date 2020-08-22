@@ -4,6 +4,7 @@ from alpha_vantage.sectorperformance import SectorPerformances
 from alpha_vantage.techindicators import TechIndicators
 from fundamental_data import FundamentalData
 from config import key
+from sklearn import preprocessing
 
 ts = TimeSeries(key, output_format='pandas')
 sp = SectorPerformances(key, output_format='pandas')
@@ -22,9 +23,17 @@ def get_daily_data(ticker, compact=True):  # 4 calls
     bbands, _ = ti.get_bbands(ticker, interval='daily', time_period=5, series_type='close')  # volatility
     rsi, _ = ti.get_rsi(ticker, interval='daily', time_period=5, series_type='close')  # momentum
     obv, _ = ti.get_obv(ticker, interval='daily')  # volume
-    df = pd.concat([stock[['2. high', '3. low', '4. close', '5. volume']].head(num_data_points), bbands.head(num_data_points).iloc[::-1], rsi.tail(num_data_points).iloc[::-1], obv.tail(num_data_points).iloc[::-1]], axis=1)[:-1]
+    df = pd.concat([stock[['2. high', '3. low', '4. close', '5. volume']].head(num_data_points),
+                    bbands.head(num_data_points).iloc[::-1], rsi.tail(num_data_points).iloc[::-1],
+                    obv.tail(num_data_points).iloc[::-1]], axis=1)[:-1]
     df.columns = ['High', 'Low', 'Close', 'Volume', 'UBB', 'MBB', 'LBB', 'RSI', 'OBV']
     return df
+
+
+def scale_data(df):
+    scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
+    df = scaler.fit_transform(df)
+    return pd.DataFrame(data=df, index=df[0:, 0], columns=['High', 'Low', 'Close', 'Volume', 'UBB', 'MBB', 'LBB', 'RSI', 'OBV'])
 
 
 def get_sector_performance(sector):  # 1 call
