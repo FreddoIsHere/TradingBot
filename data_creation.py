@@ -4,34 +4,37 @@ from tqdm import tqdm
 from stats import get_daily_data
 import time
 import sys
+import os
+
+current_folder = os.getcwd()
 
 
 class DataCreator:
-    def __init__(self, tickers):
-        self.tickers = tickers
-        data, labels = self.create_data(tickers)
-        self.stocks = pd.concat(data, keys=tickers)
+    def __init__(self, path=current_folder):
+        self.path = path
+
+    def provide_training_stock(self):
+        stock = pd.read_pickle(self.path + '/stocks')
+        signals = pd.read_pickle(self.path + '/signals')
+        return stock, signals
 
     def create_data(self, tickers):
-        stocks = []
-        labels = []
         for t in tickers:
             start_time = time.time()
             stock = get_daily_data(t, False)
-            label = self.create_labels(stock)
-            stocks.append(stock)
-            labels.append(label)
+            signals = self.create_labels(stock)
+            stock.to_pickle(self.path + '/stocks')
+            signals.to_pickle(self.path + '/signals')
             elapsed_time = time.time()
             time_to_sleep = int(61 - (elapsed_time - start_time))
-            for i in range(time_to_sleep, 0, -1): # only 5 api calls per minute allowed
+            for i in range(time_to_sleep, 0, -1):  # only 5 api calls per minute allowed
                 sys.stdout.write("\r")
                 sys.stdout.write("Waiting time for next API call: {:2d}s".format(i))
                 sys.stdout.flush()
                 time.sleep(1)
+        print("All data retrieved!")
 
-        return stocks, labels
-
-    def create_labels(self, df, col_name='Close', window_size=10):
+    def create_labels(self, df, col_name='Close', window_size=21):
         """
         Label code : BUY => 1, SELL => 0, HOLD => 2
         """
@@ -39,6 +42,7 @@ class DataCreator:
         total_rows = len(df)
         labels = np.zeros(total_rows)
         labels[:] = np.nan
+        labels[:window_size] = 2
         print("Calculating labels")
         pbar = tqdm(total=total_rows)
 
@@ -72,7 +76,10 @@ class DataCreator:
             pbar.update(1)
 
         pbar.close()
-        return labels
+        df = pd.DataFrame(data=labels, columns=['Signal'])
+        return df
 
 
-dc = DataCreator(['MSFT'])
+dc = DataCreator()
+dc.create_data(['MSFT'])
+print(dc.provide_training_stock())
