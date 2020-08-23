@@ -1,17 +1,33 @@
 import torch
+import torch.nn as nn
+from torch.optim import Adam
 from data_creation import DataCreator
 from networks import Net
+import os
+current_folder = os.getcwd()
 
 
 class Model:
-    def __init__(self):
+    def __init__(self, path=current_folder, learning_rate=0.01):
+        self.path = path
         self.data_creator = DataCreator()
-        self.net = Net(input_dim=9, hidden_dim=100)
+        try:
+            self.net = torch.load(self.path + "/net.pth")
+            print("--------------------------------\n"
+                  "Models were loaded successfully! \n"
+                  "--------------------------------")
+        except:
+            print("-----------------------\n"
+                  "No models were loaded! \n"
+                  "-----------------------")
+            self.net = Net(input_dim=66, hidden_dim=128)
         self.net.cuda()
+        self.criterion = nn.MSELoss()
+        self.optimiser = Adam(self.net.parameters(), lr=learning_rate)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimiser, patience=30, min_lr=1e-9)
 
     def train(self, epochs):
 
-        print_every = 50
         losses = []
         data_loader = self.data_creator.provide_training_stock()
 
@@ -20,38 +36,26 @@ class Model:
 
             for i, (batch_x, batch_y) in enumerate(data_loader):
 
-                # Get batch size
-                batch_size = batch_x.size()[0]
+                batch_x = torch.tensor(batch_x).float().cuda()
+                batch_y = batch_y.long().cuda()
 
-                # Scale the data
-                train_x = torch.tensor(train_x)
-
-                # print(train_x[:10])
-
-                train_y = train_y.long()
-
-                model.train()
-
-                model.zero_grad()
-
-                # In GPU
-                if train_on_gpu:
-                    train_x = train_x.float().cuda()
-                    train_y = train_y.cuda()
-
-                output = model(train_x)
-
-                loss = criterion(output, train_y)
-
+                self.net.zero_grad()
+                output = self.net(batch_x)
+                loss = self.criterion(output, batch_y)
                 loss.backward()
-                optimizer.step()
+                self.optimiser.step()
 
                 # Print some loss stats
-                if batch_i % print_every == 0:
+                if i % 10 == 0:
                     # append losses
                     losses.append((loss.item()))
                     # print  losses
                     print('Epoch [{:5d}/{:5d}] | loss: {:6.4f}'.format(
                         epoch + 1, epochs, loss.item()))
+        print("Training completed!")
 
-        return model
+    def save(self):
+        torch.save(self.net, self.path + "/net.pth")
+
+model = Model()
+model.train(20)

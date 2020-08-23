@@ -83,8 +83,3 @@ class DataCreator:
         pbar.close()
         df = pd.DataFrame(data=labels, columns=['Signal'])
         return df
-
-
-dc = DataCreator()
-dc.create_data(['MSFT'])
-print(dc.provide_training_stock())

@@ -12,7 +12,7 @@ ts = TimeSeries(key, output_format='pandas')
 sp = SectorPerformances(key, output_format='pandas')
 ti = TechIndicators(key, output_format='pandas')
 fd = FundamentalData(key, output_format='pandas')
-indicator_periods = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]
+indicator_periods = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 
 
 def get_daily_data(ticker, compact=True):  # 1 call
