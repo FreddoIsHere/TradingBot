@@ -31,15 +31,15 @@ class DataCreator:
             scale_data(stock).to_pickle(self.path + '/stocks')
             signals.to_pickle(self.path + '/signals')
             elapsed_time = time.time()
-            time_to_sleep = int(61 - (elapsed_time - start_time))
+            time_to_sleep = int(13 - (elapsed_time - start_time))
             for i in range(time_to_sleep, 0, -1):  # only 5 api calls per minute allowed
                 sys.stdout.write("\r")
                 sys.stdout.write("Waiting time for next API call: {:2d}s".format(i))
                 sys.stdout.flush()
                 time.sleep(1)
-        print("All data retrieved!")
+        print("\nAll data retrieved!")
 
-    def create_labels(self, df, col_name='Close', window_size=21):
+    def create_labels(self, df, col_name='close', window_size=21):
         """
         Label code : BUY => 1, SELL => 0, HOLD => 2
         """
