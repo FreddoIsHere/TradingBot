@@ -2,7 +2,7 @@ from tqdm import tqdm
 from stats import get_daily_data, scale_data
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
-import pandas as pd
+import pickle
 import torch
 import time
 import sys
@@ -16,27 +16,29 @@ class DataCreator:
         self.path = path
 
     def provide_training_stock(self):
-        stock = pd.read_pickle(self.path + '/stocks')
-        signals = pd.read_pickle(self.path + '/signals')
-        train_X = torch.from_numpy(stock.values)
-        train_Y = torch.from_numpy(signals.values)
-        train_set = TensorDataset(train_X, train_Y)
-        return DataLoader(train_set, shuffle=False, batch_size=16)
+        with open(self.path + '/stocks.pkl', 'rb') as infile_1:
+            with open(self.path + '/signals.pkl', 'rb') as infile_2:
+                stock = pickle.load(infile_1)
+                signals = pickle.load(infile_2)
+        train_set = TensorDataset(torch.from_numpy(stock), torch.from_numpy(signals))
+        return DataLoader(train_set, shuffle=False, batch_size=1)
 
     def create_data(self, tickers):
-        for t in tickers:
-            start_time = time.time()
-            stock = get_daily_data(t, False)
-            signals = self.create_labels(stock)
-            scale_data(stock).to_pickle(self.path + '/stocks')
-            signals.to_pickle(self.path + '/signals')
-            elapsed_time = time.time()
-            time_to_sleep = int(13 - (elapsed_time - start_time))
-            for i in range(time_to_sleep, 0, -1):  # only 5 api calls per minute allowed
-                sys.stdout.write("\r")
-                sys.stdout.write("Waiting time for next API call: {:2d}s".format(i))
-                sys.stdout.flush()
-                time.sleep(1)
+        with open(self.path + '/stocks.pkl', 'wb') as outfile_1:
+            with open(self.path + '/signals.pkl', 'wb') as outfile_2:
+                for t in tickers:
+                    start_time = time.time()
+                    stock = get_daily_data(t, False)
+                    signals = self.create_labels(stock)
+                    pickle.dump(scale_data(stock), outfile_1, pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(signals, outfile_2, pickle.HIGHEST_PROTOCOL)
+                    elapsed_time = time.time()
+                    time_to_sleep = int(13 - (elapsed_time - start_time))
+                    for i in range(time_to_sleep, 0, -1):  # only 5 api calls per minute allowed
+                        sys.stdout.write("\r")
+                        sys.stdout.write("Waiting time for next API call: {:2d}s".format(i))
+                        sys.stdout.flush()
+                        time.sleep(1)
         print("\nAll data retrieved!")
 
     def create_labels(self, df, col_name='close', window_size=21):
@@ -81,5 +83,4 @@ class DataCreator:
             pbar.update(1)
 
         pbar.close()
-        df = pd.DataFrame(data=labels, columns=['Signal'])
-        return df
+        return labels

@@ -20,7 +20,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = Net(input_dim=66, hidden_dim=128)
+            self.net = Net(input_dim=95, hidden_dim=128)
         self.net.cuda()
         self.criterion = nn.MSELoss()
         self.optimiser = Adam(self.net.parameters(), lr=learning_rate)
@@ -35,9 +35,8 @@ class Model:
         for epoch in range(epochs):
 
             for i, (batch_x, batch_y) in enumerate(data_loader):
-
-                batch_x = torch.tensor(batch_x).float().cuda()
-                batch_y = batch_y.long().cuda()
+                batch_x = batch_x.float().cuda()
+                batch_y = batch_y.float().cuda()
 
                 self.net.zero_grad()
                 output = self.net(batch_x)
@@ -46,7 +45,7 @@ class Model:
                 self.optimiser.step()
 
                 # Print some loss stats
-                if i % 10 == 0:
+                if i % 200 == 0:
                     # append losses
                     losses.append((loss.item()))
                     # print  losses

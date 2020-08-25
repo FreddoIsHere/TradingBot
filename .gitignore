@@ -1,4 +1,5 @@
 config.py
 chromedriver
-signals
-stocks
+signals.pkl
+stocks.pkl
+net.pth

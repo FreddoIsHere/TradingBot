@@ -40,10 +40,9 @@ def get_daily_data(ticker, compact=True):  # 1 call
 
 
 def scale_data(df):
-    columns = df.columns
     scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
-    df = scaler.fit_transform(df)
-    return pd.DataFrame(data=df, index=df[0:, 0], columns=columns)
+    df = scaler.fit_transform(df.to_numpy()[:, 1:])
+    return df
 
 
 def get_sector_performance(sector):  # 1 call
