@@ -16,7 +16,7 @@ indicator_periods = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 
 
 def get_daily_data(ticker, compact=True):  # 1 call
-    print("Loading data for ticker: {}".format(ticker))
+    print("\nLoading data for ticker: {}".format(ticker))
     outputsize = 'compact'
     num_data_points = 100
     if not compact:
@@ -30,7 +30,7 @@ def get_daily_data(ticker, compact=True):  # 1 call
         offset = indicator_periods[-1] - period
         indicators.append(TA.BBANDS(ohlc=stock[offset:], period=period)[period - 1:])  # volatility
         indicators.append(TA.RSI(ohlc=stock[offset:], period=period).to_frame(name='RSI')[period - 1:])  # momentum
-        indicators.append(TA.CCI(ohlc=stock[offset:], period=period).to_frame(name='CCI')[period - 1:])  # trend
+        indicators.append(TA.ZLEMA(ohlc=stock[offset:], period=period).to_frame(name='ZLEMA')[period - 1:])  # trend
         indicators.append(TA.EFI(ohlcv=stock[offset:], period=period).to_frame(name='EFI')[period - 1:])  # volume
     indicators.append(TA.ADL(ohlcv=stock).to_frame(name='ADL')[indicator_periods[-1] - 1:])
 
@@ -40,6 +40,7 @@ def get_daily_data(ticker, compact=True):  # 1 call
 
 
 def scale_data(df):
+    df = df.reset_index()
     scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
     df = scaler.fit_transform(df.to_numpy()[:, 1:])
     return df

@@ -4,6 +4,7 @@ from torch.optim import Adam
 from data_creation import DataCreator
 from networks import Net
 import os
+from config import training_indices
 current_folder = os.getcwd()
 
 
@@ -56,5 +57,8 @@ class Model:
     def save(self):
         torch.save(self.net, self.path + "/net.pth")
 
-model = Model()
-model.train(20)
+
+if __name__ == "__main__":
+    model = Model()
+    model.train(5)
+    model.save()
