@@ -19,14 +19,15 @@ class DataCreator:
     def provide_training_stock(self):
         stocks = []
         signals = []
-        with open(self.path + '/stocks.pkl', 'rb') as infile_1:
-            with open(self.path + '/signals.pkl', 'rb') as infile_2:
-                stocks.append(pickle.load(infile_1))
-                signals.append(pickle.load(infile_2))
+        with open(self.path + '/sp100_stocks.pkl', 'rb') as infile_1:
+            with open(self.path + '/sp100_signals.pkl', 'rb') as infile_2:
+                for _ in range(len(training_indices)):
+                    stocks.append(pickle.load(infile_1))
+                    signals.append(pickle.load(infile_2))
         stocks = np.vstack(stocks)
-        signals = np.vstack(signals)
+        signals = np.hstack(signals)
         train_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
-        return DataLoader(train_set, shuffle=True, batch_size=64)
+        return DataLoader(train_set, shuffle=True, batch_size=128)
 
     def create_data(self, tickers):
         with open(self.path + '/stocks.pkl', 'wb') as outfile_1:
