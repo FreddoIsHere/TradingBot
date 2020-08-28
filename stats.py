@@ -24,7 +24,7 @@ def get_daily_data(ticker, compact=True):  # 1 call
         num_data_points = 1000
     stock, meta_data = ts.get_daily(ticker, outputsize=outputsize)
     stock.columns = ['open', 'high', 'low', 'close', 'volume']
-    stock = stock[:num_data_points]
+    stock = stock[:num_data_points].iloc[::-1]
     indicators = []
     for period in indicator_periods:
         offset = indicator_periods[-1] - period
@@ -44,6 +44,12 @@ def scale_data(df):
     scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
     df = scaler.fit_transform(df.to_numpy()[:, 1:])
     return df
+
+
+def relabel_data(array):
+    encoder = preprocessing.OneHotEncoder(sparse=False, categories='auto')
+    array = encoder.fit_transform(array.reshape(-1, 1))
+    return array
 
 
 def get_sector_performance(sector):  # 1 call

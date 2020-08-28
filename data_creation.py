@@ -1,5 +1,5 @@
 from tqdm import tqdm
-from stats import get_daily_data, scale_data
+from stats import get_daily_data, scale_data, relabel_data
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
 import pickle
@@ -13,8 +13,9 @@ current_folder = os.getcwd()
 
 
 class DataCreator:
-    def __init__(self, path=current_folder):
+    def __init__(self, batch_size, path=current_folder):
         self.path = path
+        self.batch_size = batch_size
 
     def provide_training_stock(self):
         stocks = []
@@ -27,15 +28,16 @@ class DataCreator:
         stocks = np.vstack(stocks)
         signals = np.hstack(signals)
         train_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
-        return DataLoader(train_set, shuffle=True, batch_size=128)
+        return DataLoader(train_set, shuffle=True, batch_size=self.batch_size)
 
-    def create_data(self, tickers):
-        with open(self.path + '/stocks.pkl', 'wb') as outfile_1:
-            with open(self.path + '/signals.pkl', 'wb') as outfile_2:
+    def create_data(self, tickers, window_size=11):
+        with open(self.path + '/sp100_stocks.pkl', 'wb') as outfile_1:
+            with open(self.path + '/sp100_signals.pkl', 'wb') as outfile_2:
                 for t in tickers:
                     start_time = time.time()
                     stock = get_daily_data(t, False)
-                    signals = self.create_labels(stock)
+                    signals = self.create_labels(stock, window_size=window_size)[window_size:]
+                    stock = stock[window_size:]
                     pickle.dump(scale_data(stock), outfile_1, pickle.HIGHEST_PROTOCOL)
                     pickle.dump(signals, outfile_2, pickle.HIGHEST_PROTOCOL)
                     elapsed_time = time.time()
@@ -47,7 +49,7 @@ class DataCreator:
                         time.sleep(1)
         print("\nAll data retrieved!")
 
-    def create_labels(self, df, col_name='close', window_size=21):
+    def create_labels(self, df, col_name='close', window_size=11):
         """
         Label code : BUY => 1, SELL => 0, HOLD => 2
         """
@@ -55,7 +57,6 @@ class DataCreator:
         total_rows = len(df)
         labels = np.zeros(total_rows)
         labels[:] = np.nan
-        labels[:window_size] = 2
         print("Calculating labels")
         pbar = tqdm(total=total_rows)
 
@@ -95,9 +96,9 @@ class DataCreator:
 if __name__ == "__main__":
     try:
         print("Deleting old training data!")
-        os.remove(current_folder + '/stocks.pkl')
-        os.remove(current_folder + '/signals.pkl')
+        os.remove(current_folder + '/sp100_stocks.pkl')
+        os.remove(current_folder + '/sp100_signals.pkl')
     except:
         print("Data retrieval started!")
-    creator = DataCreator()
+    creator = DataCreator(128)
     creator.create_data(training_indices)
