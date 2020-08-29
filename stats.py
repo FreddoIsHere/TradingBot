@@ -12,7 +12,7 @@ ts = TimeSeries(key, output_format='pandas')
 sp = SectorPerformances(key, output_format='pandas')
 ti = TechIndicators(key, output_format='pandas')
 fd = FundamentalData(key, output_format='pandas')
-indicator_periods = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+indicator_periods = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 
 
 def get_daily_data(ticker, compact=True):  # 1 call
@@ -27,16 +27,17 @@ def get_daily_data(ticker, compact=True):  # 1 call
     stock = stock[:num_data_points].iloc[::-1]
     indicators = []
     for period in indicator_periods:
-        offset = indicator_periods[-1] - period
-        indicators.append(TA.BBANDS(ohlc=stock[offset:], period=period)[period - 1:])  # volatility
-        indicators.append(TA.RSI(ohlc=stock[offset:], period=period).to_frame(name='RSI')[period - 1:])  # momentum
-        indicators.append(TA.ZLEMA(ohlc=stock[offset:], period=period).to_frame(name='ZLEMA')[period - 1:])  # trend
-        indicators.append(TA.EFI(ohlcv=stock[offset:], period=period).to_frame(name='EFI')[period - 1:])  # volume
-    indicators.append(TA.ADL(ohlcv=stock).to_frame(name='ADL')[indicator_periods[-1] - 1:])
-
-    df = pd.concat(indicators, axis=1)
-    df = pd.concat([stock[indicator_periods[-1] - 1:], df], axis=1)
-    return df
+        indicators.append(TA.BBANDS(ohlc=stock, period=period))  # volatility
+        indicators.append(TA.ATR(ohlc=stock, period=period).to_frame(name='TR'))  # volatility
+        indicators.append(TA.RSI(ohlc=stock, period=period).to_frame(name='RSI'))  # momentum
+        indicators.append(TA.MFI(ohlc=stock, period=period).to_frame(name='MFI'))  # momentum
+        indicators.append(TA.ZLEMA(ohlc=stock, period=period).to_frame(name='ZLEMA'))  # trend
+        indicators.append(TA.EFI(ohlcv=stock, period=period).to_frame(name='EFI'))  # volume
+        indicators.append(TA.EMV(ohlcv=stock, period=period).to_frame(name='EMV'))  # volume
+    indicators.append(TA.ADL(ohlcv=stock).to_frame(name='ADL'))
+    df = pd.concat(indicators, axis=1)[indicator_periods[-1]:]
+    stock = stock[indicator_periods[-1]:]
+    return stock, df
 
 
 def scale_data(df):

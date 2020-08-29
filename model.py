@@ -15,7 +15,7 @@ current_folder = os.getcwd()
 
 
 class Model:
-    def __init__(self, path=current_folder, learning_rate=1e-2, batch_size=128):
+    def __init__(self, path=current_folder, learning_rate=1e-3, batch_size=128):
         self.path = path
         self.batch_size = batch_size
         self.data_creator = DataCreator(self.batch_size)
@@ -29,8 +29,11 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = Net(input_dim=96, hidden_dim=192)
+            self.net = Net(input_dim=136, hidden_dim=272)
         self.net.cuda()
+
+    def test(self):
+        pass
 
     def train(self, epochs):
 
@@ -40,7 +43,7 @@ class Model:
         accuracies = []
         data_loader, class_weights = self.data_creator.provide_training_stock()
         criterion = nn.CrossEntropyLoss()
-        optimiser = Adam(self.net.parameters(), lr=self.learning_rate)
+        optimiser = Adam(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-3)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=10, min_lr=1e-9)
         self.net.train(True)
         pbar = tqdm(total=epochs)

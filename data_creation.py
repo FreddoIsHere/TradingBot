@@ -40,10 +40,10 @@ class DataCreator:
             with open(self.path + '/sp100_signals.pkl', 'wb') as outfile_2:
                 for t in tickers:
                     start_time = time.time()
-                    stock = get_daily_data(t, False)
+                    stock, data = get_daily_data(t, False)
                     signals = self.create_labels(stock, window_size=window_size)[window_size:]
-                    stock = stock[window_size:]
-                    pickle.dump(scale_data(stock), outfile_1, pickle.HIGHEST_PROTOCOL)
+                    data = data[window_size:]
+                    pickle.dump(scale_data(data), outfile_1, pickle.HIGHEST_PROTOCOL)
                     pickle.dump(signals, outfile_2, pickle.HIGHEST_PROTOCOL)
                     elapsed_time = time.time()
                     time_to_sleep = int(13 - (elapsed_time - start_time))
