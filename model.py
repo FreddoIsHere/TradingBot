@@ -8,14 +8,18 @@ from ralamb import Ralamb
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import roc_auc_score
+from stats import relabel_data
+import torch.nn.functional as F
 current_folder = os.getcwd()
 
 
 class Model:
-    def __init__(self, path=current_folder, learning_rate=1e-4, batch_size=128):
+    def __init__(self, path=current_folder, learning_rate=1e-2, batch_size=128):
         self.path = path
         self.batch_size = batch_size
         self.data_creator = DataCreator(self.batch_size)
+        self.learning_rate = learning_rate
         try:
             self.net = torch.load(self.path + "/net.pth")
             print("--------------------------------\n"
@@ -27,15 +31,17 @@ class Model:
                   "-----------------------")
             self.net = Net(input_dim=96, hidden_dim=192)
         self.net.cuda()
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimiser = Ralamb(self.net.parameters(), lr=learning_rate)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimiser, patience=30, min_lr=1e-9)
 
     def train(self, epochs):
 
-        accuracies = []
+        rocs_aucs = []
+        baseline_rocs_aucs = []
         losses = []
-        data_loader = self.data_creator.provide_training_stock()
+        accuracies = []
+        data_loader, class_weights = self.data_creator.provide_training_stock()
+        criterion = nn.CrossEntropyLoss()
+        optimiser = Adam(self.net.parameters(), lr=self.learning_rate)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=10, min_lr=1e-9)
         self.net.train(True)
         pbar = tqdm(total=epochs)
 
@@ -48,22 +54,31 @@ class Model:
 
                 self.net.zero_grad()
                 output = self.net(batch_x)
-                loss = self.criterion(output, batch_y)
+                loss = criterion(output, batch_y)
                 loss.backward()
-                self.optimiser.step()
+                optimiser.step()
+
+                scheduler.step(loss.item())
 
                 # Print some loss stats
                 if i % 10 == 0:
-                    output_metric = np.argmax(output.detach().cpu().numpy(), axis=1).flatten()
-                    label_metric = batch_y.detach().cpu().numpy().flatten()
-                    accuracy = 100*sum(1 if output_metric[k] == label_metric[k] else 0 for k in range(self.batch_size))/self.batch_size
+                    output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
+                    random_metric = relabel_data(np.random.choice([0, 1, 2], size=(1, self.batch_size), p=[1/3, 1/3, 1/3]))
+                    label_metric = relabel_data(batch_y.detach().cpu().numpy())
                     losses.append((loss.item()))
+                    rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
+                    baseline_rocs_aucs.append(roc_auc_score(label_metric, random_metric, multi_class='ovo'))
+                    accuracy = 100 * sum(1 if np.argmax(output_metric[k]) == np.argmax(label_metric[k]) else 0 for k in
+                                         range(self.batch_size)) / self.batch_size
                     accuracies.append(accuracy)
             pbar.update(1)
         pbar.close()
-        fig, axs = plt.subplots(1, 2)
+        fig, axs = plt.subplots(1, 3)
         axs[0].plot(losses)
-        axs[1].plot(accuracies)
+        axs[1].plot(rocs_aucs)
+        axs[1].plot(baseline_rocs_aucs)
+        axs[1].legend(['Net', 'Baseline'])
+        axs[2].plot(accuracies)
         plt.show()
 
     def save(self):
@@ -77,6 +92,6 @@ if __name__ == "__main__":
     except:
         print("Training started!")
     model = Model()
-    model.train(2)
+    model.train(1)
     model.save()
     print("Training completed!")

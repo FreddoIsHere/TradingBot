@@ -1,6 +1,6 @@
 from tqdm import tqdm
 from stats import get_daily_data, scale_data, relabel_data
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 import numpy as np
 import pickle
 import torch
@@ -27,8 +27,13 @@ class DataCreator:
                     signals.append(pickle.load(infile_2))
         stocks = np.vstack(stocks)
         signals = np.hstack(signals)
+        n = signals.size
+        class_weights = torch.tensor([n/sum(1 if x == 0 else 0 for x in signals), n/sum(1 if x == 1 else 0 for x in signals), n/sum(1 if x == 2 else 0 for x in signals)]).float()
+        class_weights = class_weights/class_weights.sum()
+        weights = class_weights[signals]
         train_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
-        return DataLoader(train_set, shuffle=True, batch_size=self.batch_size)
+        sampler = WeightedRandomSampler(weights=weights, num_samples=n, replacement=True)
+        return DataLoader(train_set, batch_size=self.batch_size, sampler=sampler), class_weights
 
     def create_data(self, tickers, window_size=11):
         with open(self.path + '/sp100_stocks.pkl', 'wb') as outfile_1:
