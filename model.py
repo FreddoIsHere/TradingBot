@@ -61,7 +61,7 @@ class Model:
                 scheduler.step(loss.item())
 
                 # Print some loss stats
-                if i % 10 == 0:
+                if i % 2 == 0:
                     output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
                     random_metric = relabel_data(np.random.choice([0, 1, 2], size=(1, self.batch_size), p=[1/3, 1/3, 1/3]))
                     label_metric = relabel_data(batch_y.detach().cpu().numpy())
@@ -74,11 +74,11 @@ class Model:
             pbar.update(1)
         pbar.close()
         fig, axs = plt.subplots(1, 3)
-        axs[0].plot(losses)
-        axs[1].plot(rocs_aucs)
-        axs[1].plot(baseline_rocs_aucs)
+        axs[0].plot(np.convolve(losses, (1/25)*np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(rocs_aucs, (1/25)*np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(baseline_rocs_aucs, (1/25)*np.ones(25), mode='valid'))
         axs[1].legend(['Net', 'Baseline'])
-        axs[2].plot(accuracies)
+        axs[2].plot(np.convolve(accuracies, (1/25)*np.ones(25), mode='valid'))
         plt.show()
 
     def save(self):
