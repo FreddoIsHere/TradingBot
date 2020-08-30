@@ -5,6 +5,7 @@ from data_creation import DataCreator
 from networks import Net
 from tqdm import tqdm
 from ralamb import Ralamb
+import argparse
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,7 +34,44 @@ class Model:
         self.net.cuda()
 
     def test(self):
-        pass
+
+        losses = []
+        accuracies = []
+        buy_accuracies = []
+        sell_accuracies = []
+        hold_accuracies = []
+        data_loader = self.data_creator.provide_testing_stock()
+        criterion = nn.CrossEntropyLoss()
+        self.net.train(False)
+        with torch.no_grad():
+            for i, (batch_x, batch_y) in enumerate(data_loader):
+                batch_x = batch_x.float().cuda()
+                batch_y = batch_y.long().cuda()
+
+                output = self.net(batch_x)
+                loss = criterion(output, batch_y)
+
+                output_metric = np.argmax(F.softmax(output, dim=1).cpu().numpy(), axis=1)
+                batch_size = batch_y.size()[0]
+                batch_y = batch_y.cpu().numpy()
+                sell_mask_label = batch_y == 0
+                sell_mask_output = output_metric == 0
+                sell_accuracies.append(100*(sell_mask_label == sell_mask_output).sum()/batch_size)
+                buy_mask_label = batch_y == 1
+                buy_mask_output = output_metric == 1
+                buy_accuracies.append(100*(buy_mask_label == buy_mask_output).sum()/batch_size)
+                hold_mask_label = batch_y == 2
+                hold_mask_output = output_metric == 2
+                hold_accuracies.append(100*(hold_mask_label == hold_mask_output).sum()/batch_size)
+                losses.append((loss.item()))
+                accuracy = 100 * sum(1 if output_metric[k] == batch_y[k] else 0 for k in
+                                     range(batch_size)) / batch_size
+                accuracies.append(accuracy)
+        print("Average loss: ", np.mean(losses))
+        print("Average accuracy: ", np.mean(accuracies))
+        print("Buy-Average accuracy: ", np.mean(buy_accuracies))
+        print("Sell-Average accuracy: ", np.mean(sell_accuracies))
+        print("Hold-Average accuracy: ", np.mean(hold_accuracies))
 
     def train(self, epochs):
 
@@ -89,12 +127,20 @@ class Model:
 
 
 if __name__ == "__main__":
-    try:
-        print("Deleting old net!")
-        os.remove(current_folder + '/net.pth')
-    except:
-        print("Training started!")
-    model = Model()
-    model.train(1)
-    model.save()
-    print("Training completed!")
+    parser = argparse.ArgumentParser(description='Model')
+    parser.add_argument('--train', nargs="?", type=bool, default=False, help='training or testing')
+    args = parser.parse_args()
+    if args.train:
+        try:
+            print("Deleting old net!")
+            os.remove(current_folder + '/net.pth')
+        except:
+            print("Training started!")
+        model = Model()
+        model.train(1)
+        model.save()
+        print("Training completed!")
+    else:
+        model = Model()
+        model.test()
+        print("Testing completed!")

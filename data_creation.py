@@ -7,7 +7,8 @@ import torch
 import time
 import sys
 import os
-from config import training_indices
+import argparse
+from config import training_indices, testing_indices
 
 current_folder = os.getcwd()
 
@@ -35,9 +36,22 @@ class DataCreator:
         sampler = WeightedRandomSampler(weights=weights, num_samples=n, replacement=True)
         return DataLoader(train_set, batch_size=self.batch_size, sampler=sampler), class_weights
 
-    def create_data(self, tickers, window_size=11):
-        with open(self.path + '/sp100_stocks.pkl', 'wb') as outfile_1:
-            with open(self.path + '/sp100_signals.pkl', 'wb') as outfile_2:
+    def provide_testing_stock(self):
+        stocks = []
+        signals = []
+        with open(self.path + '/test_stocks.pkl', 'rb') as infile_1:
+            with open(self.path + '/test_signals.pkl', 'rb') as infile_2:
+                for _ in range(len(testing_indices)):
+                    stocks.append(pickle.load(infile_1))
+                    signals.append(pickle.load(infile_2))
+        stocks = np.vstack(stocks)
+        signals = np.hstack(signals)
+        test_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
+        return DataLoader(test_set, batch_size=self.batch_size, shuffle=True)
+
+    def create_data(self, tickers, stock_path, label_path, window_size=11):
+        with open(stock_path, 'wb') as outfile_1:
+            with open(label_path, 'wb') as outfile_2:
                 for t in tickers:
                     start_time = time.time()
                     stock, data = get_daily_data(t, False)
@@ -99,11 +113,28 @@ class DataCreator:
 
 
 if __name__ == "__main__":
-    try:
-        print("Deleting old training data!")
-        os.remove(current_folder + '/sp100_stocks.pkl')
-        os.remove(current_folder + '/sp100_signals.pkl')
-    except:
-        print("Data retrieval started!")
+    parser = argparse.ArgumentParser(description='Data Creation')
+    parser.add_argument('--train', nargs="?", type=bool, default=False, help='training or testing')
+    args = parser.parse_args()
     creator = DataCreator(128)
-    creator.create_data(training_indices)
+    if args.train:
+        try:
+            print("Training")
+            print("Deleting old training data!")
+            os.remove(current_folder + '/sp100_stocks.pkl')
+            os.remove(current_folder + '/sp100_signals.pkl')
+        except:
+            print("Data retrieval started!")
+        indices = training_indices
+        creator.create_data(indices, stock_path=current_folder + '/sp100_stocks.pkl', label_path=current_folder + '/sp100_signals.pkl')
+    else:
+        print("Testing")
+        try:
+            print("Deleting old testing data!")
+            os.remove(current_folder + '/test_stocks.pkl')
+            os.remove(current_folder + '/test_signals.pkl')
+        except:
+            print("Data retrieval started!")
+        indices = testing_indices
+        creator.create_data(indices, stock_path=current_folder + '/test_stocks.pkl',
+                            label_path=current_folder + '/test_signals.pkl')
