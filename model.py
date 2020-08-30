@@ -10,7 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_auc_score
-from stats import relabel_data
+from stats import relabel_data, get_daily_data
 import torch.nn.functional as F
 current_folder = os.getcwd()
 
@@ -32,6 +32,15 @@ class Model:
                   "-----------------------")
             self.net = Net(input_dim=136, hidden_dim=272)
         self.net.cuda()
+
+    def predict_signal(self, ticker):
+        signals = ['SELL', 'BUY', 'HOLD']
+        _, data = get_daily_data(ticker, compact=True)
+        self.net.train(False)
+        with torch.no_grad():
+            input = torch.tensor(data.to_numpy()[-1]).float().cuda()
+            output = np.argmax(F.softmax(self.net(input), dim=-1).cpu().numpy())
+        return signals[int(output)]
 
     def test(self):
 
