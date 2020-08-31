@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.optim import Adam
+import torch.optim as optim
 from data_creation import DataCreator
 from networks import Net
 from tqdm import tqdm
@@ -17,6 +17,7 @@ current_folder = os.getcwd()
 
 class Model:
     def __init__(self, path=current_folder, learning_rate=1e-3, batch_size=128):
+        torch.manual_seed(12345)
         self.path = path
         self.batch_size = batch_size
         self.data_creator = DataCreator(self.batch_size)
@@ -30,7 +31,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = Net(input_dim=136, hidden_dim=272)
+            self.net = Net(input_dim=225, hidden_dim=450)
         self.net.cuda()
 
     def predict_signal(self, ticker):
@@ -39,8 +40,9 @@ class Model:
         self.net.train(False)
         with torch.no_grad():
             input = torch.tensor(data.to_numpy()[-1]).float().cuda()
-            output = np.argmax(F.softmax(self.net(input), dim=-1).cpu().numpy())
-        return signals[int(output)]
+            output = F.softmax(self.net(input), dim=-1).cpu().numpy()
+            signal_idx = np.argmax(output)
+        return signals[int(signal_idx)], 100*output[signal_idx]
 
     def test(self):
 
@@ -90,8 +92,8 @@ class Model:
         accuracies = []
         data_loader, class_weights = self.data_creator.provide_training_stock()
         criterion = nn.CrossEntropyLoss()
-        optimiser = Adam(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=10, min_lr=1e-9)
+        optimiser = optim.AdamW(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-5, amsgrad=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=220, min_lr=1e-9)
         self.net.train(True)
         pbar = tqdm(total=epochs)
 

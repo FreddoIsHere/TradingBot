@@ -13,5 +13,5 @@ parser.add_argument('--ticker', nargs="?", type=str, help='Ticker')
 args = parser.parse_args()
 model = Model()
 ticker = args.ticker
-prediction = model.predict_signal(ticker)
-print("Today's recommendation for {} is: {}".format(ticker, prediction))
+prediction, confidence = model.predict_signal(ticker)
+print("Today's recommendation for {} is: {} with a confidence of {}%".format(ticker, prediction, confidence))
