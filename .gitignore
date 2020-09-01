@@ -5,3 +5,4 @@ test_stocks.pkl
 sp100_signals.pkl
 sp100_stocks.pkl
 net.pth
+__pycache__

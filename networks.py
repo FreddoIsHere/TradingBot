@@ -17,7 +17,7 @@ class Net(nn.Module):
             nn.Linear(hidden_dim, 32),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(32, 3)
+            nn.Linear(32, 4)
         )
 
     def forward(self, x):

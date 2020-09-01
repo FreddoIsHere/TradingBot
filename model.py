@@ -12,6 +12,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 from stats import relabel_data, get_daily_data
 import torch.nn.functional as F
+from stats import scale_data
 current_folder = os.getcwd()
 
 
@@ -19,8 +20,7 @@ class Model:
     def __init__(self, path=current_folder, learning_rate=1e-3, batch_size=128):
         torch.manual_seed(12345)
         self.path = path
-        self.batch_size = batch_size
-        self.data_creator = DataCreator(self.batch_size)
+        self.data_creator = DataCreator(batch_size)
         self.learning_rate = learning_rate
         try:
             self.net = torch.load(self.path + "/net.pth")
@@ -35,7 +35,7 @@ class Model:
         self.net.cuda()
 
     def predict_signal(self, ticker):
-        signals = ['SELL', 'BUY', 'HOLD']
+        signals = ['SELL', 'BUY', 'HOLD', 'STOP']
         _, data = get_daily_data(ticker, compact=True)
         self.net.train(False)
         with torch.no_grad():
@@ -50,7 +50,8 @@ class Model:
         accuracies = []
         buy_accuracies = []
         sell_accuracies = []
-        hold_accuracies = []
+        up_accuracies = []
+        down_accuracies = []
         data_loader = self.data_creator.provide_testing_stock()
         criterion = nn.CrossEntropyLoss()
         self.net.train(False)
@@ -71,9 +72,12 @@ class Model:
                 buy_mask_label = batch_y == 1
                 buy_mask_output = output_metric == 1
                 buy_accuracies.append(100*(buy_mask_label == buy_mask_output).sum()/batch_size)
-                hold_mask_label = batch_y == 2
-                hold_mask_output = output_metric == 2
-                hold_accuracies.append(100*(hold_mask_label == hold_mask_output).sum()/batch_size)
+                up_mask_label = batch_y == 2
+                up_mask_output = output_metric == 2
+                up_accuracies.append(100*(up_mask_label == up_mask_output).sum()/batch_size)
+                down_mask_label = batch_y == 3
+                down_mask_output = output_metric == 3
+                down_accuracies.append(100 * (down_mask_label == down_mask_output).sum() / batch_size)
                 losses.append((loss.item()))
                 accuracy = 100 * sum(1 if output_metric[k] == batch_y[k] else 0 for k in
                                      range(batch_size)) / batch_size
@@ -82,7 +86,22 @@ class Model:
         print("Average accuracy: ", np.mean(accuracies))
         print("Buy-Average accuracy: ", np.mean(buy_accuracies))
         print("Sell-Average accuracy: ", np.mean(sell_accuracies))
-        print("Hold-Average accuracy: ", np.mean(hold_accuracies))
+        print("Hold-Average accuracy: ", np.mean(up_accuracies))
+        print("Stop-Average accuracy: ", np.mean(down_accuracies))
+
+    def display_annotated_graphs(self, ticker):
+        imperatives = ['SELL', 'BUY', 'HOLD', 'STOP']
+        stock, data = get_daily_data(ticker, True)
+        with torch.no_grad():
+            data = torch.from_numpy(scale_data(data)).float().cuda()
+            signals = self.net(data)
+            signals = np.argmax(F.softmax(signals, dim=1).cpu().numpy(), axis=1)
+        stock = stock['close']
+        plt.plot(stock.to_numpy())
+        num_signals = signals.size
+        for l in range(num_signals):
+            plt.annotate(xy=(l, stock[l]), text=imperatives[signals[l]])
+        plt.show()
 
     def train(self, epochs):
 
@@ -114,14 +133,15 @@ class Model:
 
                 # Print some loss stats
                 if i % 2 == 0:
+                    batch_size = batch_y.size()[0]
                     output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
-                    random_metric = relabel_data(np.random.choice([0, 1, 2], size=(1, self.batch_size), p=[1/3, 1/3, 1/3]))
+                    random_metric = relabel_data(np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1/4, 1/4, 1/4, 1/4]))
                     label_metric = relabel_data(batch_y.detach().cpu().numpy())
                     losses.append((loss.item()))
                     rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
                     baseline_rocs_aucs.append(roc_auc_score(label_metric, random_metric, multi_class='ovo'))
                     accuracy = 100 * sum(1 if np.argmax(output_metric[k]) == np.argmax(label_metric[k]) else 0 for k in
-                                         range(self.batch_size)) / self.batch_size
+                                         range(batch_size)) / batch_size
                     accuracies.append(accuracy)
             pbar.update(1)
         pbar.close()
@@ -154,4 +174,5 @@ if __name__ == "__main__":
     else:
         model = Model()
         model.test()
+        model.display_annotated_graphs('LYFT')
         print("Testing completed!")
