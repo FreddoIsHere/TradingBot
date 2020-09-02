@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from data_creation import DataCreator
-from networks import Net
+from networks import SimpleNet, DenseNet3
 from tqdm import tqdm
 from ralamb import Ralamb
 import argparse
@@ -13,6 +13,7 @@ from sklearn.metrics import roc_auc_score
 from stats import relabel_data, get_daily_data
 import torch.nn.functional as F
 from stats import scale_data
+
 current_folder = os.getcwd()
 
 
@@ -31,7 +32,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = Net(input_dim=225, hidden_dim=450)
+            self.net = DenseNet3(depth=40, num_classes=4)  # SimpleNet(225, 450)
         self.net.cuda()
 
     def predict_signal(self, ticker):
@@ -42,7 +43,7 @@ class Model:
             input = torch.tensor(data.to_numpy()[-1]).float().cuda()
             output = F.softmax(self.net(input), dim=-1).cpu().numpy()
             signal_idx = np.argmax(output)
-        return signals[int(signal_idx)], 100*output[signal_idx]
+        return signals[int(signal_idx)], 100 * output[signal_idx]
 
     def test(self):
 
@@ -57,7 +58,7 @@ class Model:
         self.net.train(False)
         with torch.no_grad():
             for i, (batch_x, batch_y) in enumerate(data_loader):
-                batch_x = batch_x.float().cuda()
+                batch_x = batch_x.unsqueeze(1).float().cuda()
                 batch_y = batch_y.long().cuda()
 
                 output = self.net(batch_x)
@@ -68,13 +69,13 @@ class Model:
                 batch_y = batch_y.cpu().numpy()
                 sell_mask_label = batch_y == 0
                 sell_mask_output = output_metric == 0
-                sell_accuracies.append(100*(sell_mask_label == sell_mask_output).sum()/batch_size)
+                sell_accuracies.append(100 * (sell_mask_label == sell_mask_output).sum() / batch_size)
                 buy_mask_label = batch_y == 1
                 buy_mask_output = output_metric == 1
-                buy_accuracies.append(100*(buy_mask_label == buy_mask_output).sum()/batch_size)
+                buy_accuracies.append(100 * (buy_mask_label == buy_mask_output).sum() / batch_size)
                 up_mask_label = batch_y == 2
                 up_mask_output = output_metric == 2
-                up_accuracies.append(100*(up_mask_label == up_mask_output).sum()/batch_size)
+                up_accuracies.append(100 * (up_mask_label == up_mask_output).sum() / batch_size)
                 down_mask_label = batch_y == 3
                 down_mask_output = output_metric == 3
                 down_accuracies.append(100 * (down_mask_label == down_mask_output).sum() / batch_size)
@@ -93,7 +94,7 @@ class Model:
         imperatives = ['SELL', 'BUY', 'HOLD', 'STOP']
         stock, data = get_daily_data(ticker, True)
         with torch.no_grad():
-            data = torch.from_numpy(scale_data(data)).float().cuda()
+            data = torch.from_numpy(scale_data(data)).reshape(-1, 15, 15).unsqueeze(1).float().cuda()
             signals = self.net(data)
             signals = np.argmax(F.softmax(signals, dim=1).cpu().numpy(), axis=1)
         stock = stock['close']
@@ -120,7 +121,7 @@ class Model:
         for epoch in range(epochs):
 
             for i, (batch_x, batch_y) in enumerate(data_loader):
-                batch_x = batch_x.float().cuda()
+                batch_x = batch_x.unsqueeze(1).float().cuda()
                 batch_y = batch_y.long().cuda()
 
                 self.net.zero_grad()
@@ -135,7 +136,8 @@ class Model:
                 if i % 2 == 0:
                     batch_size = batch_y.size()[0]
                     output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
-                    random_metric = relabel_data(np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1/4, 1/4, 1/4, 1/4]))
+                    random_metric = relabel_data(
+                        np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
                     label_metric = relabel_data(batch_y.detach().cpu().numpy())
                     losses.append((loss.item()))
                     rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
@@ -146,11 +148,11 @@ class Model:
             pbar.update(1)
         pbar.close()
         fig, axs = plt.subplots(1, 3)
-        axs[0].plot(np.convolve(losses, (1/25)*np.ones(25), mode='valid'))
-        axs[1].plot(np.convolve(rocs_aucs, (1/25)*np.ones(25), mode='valid'))
-        axs[1].plot(np.convolve(baseline_rocs_aucs, (1/25)*np.ones(25), mode='valid'))
+        axs[0].plot(np.convolve(losses, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(rocs_aucs, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(baseline_rocs_aucs, (1 / 25) * np.ones(25), mode='valid'))
         axs[1].legend(['Net', 'Baseline'])
-        axs[2].plot(np.convolve(accuracies, (1/25)*np.ones(25), mode='valid'))
+        axs[2].plot(np.convolve(accuracies, (1 / 25) * np.ones(25), mode='valid'))
         plt.show()
 
     def save(self):

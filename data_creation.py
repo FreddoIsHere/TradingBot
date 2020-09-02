@@ -34,7 +34,9 @@ class DataCreator:
         class_weights = torch.tensor([n/sum(1 if x == 0 else 0 for x in signals), n/sum(1 if x == 1 else 0 for x in signals), n/sum(1 if x == 2 else 0 for x in signals), n/sum(1 if x == 3 else 0 for x in signals)]).float()
         class_weights = class_weights/class_weights.sum()
         weights = class_weights[signals]
-        train_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
+        stocks = torch.from_numpy(stocks)
+        signals = torch.from_numpy(signals)
+        train_set = TensorDataset(stocks.reshape(-1, 15, 15), signals)
         sampler = WeightedRandomSampler(weights=weights, num_samples=n, replacement=True)
         return DataLoader(train_set, batch_size=self.batch_size, sampler=sampler), class_weights
 
@@ -48,7 +50,9 @@ class DataCreator:
                     signals.append(pickle.load(infile_2))
         stocks = np.vstack(stocks)
         signals = np.hstack(signals)
-        test_set = TensorDataset(torch.from_numpy(stocks), torch.from_numpy(signals))
+        stocks = torch.from_numpy(stocks)
+        signals = torch.from_numpy(signals)
+        test_set = TensorDataset(stocks.reshape(-1, 15, 15), signals)
         return DataLoader(test_set, batch_size=self.batch_size, shuffle=True)
 
     def create_data(self, tickers, stock_path, label_path, window_size=11):

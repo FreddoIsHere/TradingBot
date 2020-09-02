@@ -36,8 +36,8 @@ def get_daily_data(ticker, compact=True):  # 1 call
         indicators.append(TA.WILLIAMS(ohlc=stock, period=period).to_frame(name='WILLIAMS'))  # momentum
         indicators.append(TA.ZLEMA(ohlc=stock, period=period).to_frame(name='ZLEMA'))  # trend
         indicators.append(TA.WMA(ohlc=stock, period=period).to_frame(name='WMA'))  # trend
-        indicators.append(TA.HMA(ohlc=stock, period=period).to_frame(name='HMA'))  # trend x
-        indicators.append(TA.VAMA(ohlcv=stock, period=period).to_frame(name='VAMA'))  # volume x
+        indicators.append(TA.HMA(ohlc=stock, period=period).to_frame(name='HMA'))  # trend
+        indicators.append(TA.VAMA(ohlcv=stock, period=period).to_frame(name='VAMA'))  # volume
         indicators.append(TA.EFI(ohlcv=stock, period=period).to_frame(name='EFI'))  # volume
         indicators.append(TA.EMV(ohlcv=stock, period=period).to_frame(name='EMV'))  # volume
     df = pd.concat(indicators, axis=1)[indicator_periods[-1]*2:]
