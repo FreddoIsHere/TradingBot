@@ -21,7 +21,7 @@ def get_daily_data(ticker, compact=True):  # 1 call
     num_data_points = 100
     if not compact:
         outputsize = 'full'
-        num_data_points = 1000 + indicator_periods[-1]*2
+        num_data_points = 6*365 + indicator_periods[-1]*2
     stock, meta_data = ts.get_daily(ticker, outputsize=outputsize)
     stock.columns = ['open', 'high', 'low', 'close', 'volume']
     stock = stock[:num_data_points].iloc[::-1]

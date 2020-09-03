@@ -56,8 +56,8 @@ class DataCreator:
         return DataLoader(test_set, batch_size=self.batch_size, shuffle=True)
 
     def create_data(self, tickers, stock_path, label_path, window_size=11):
-        with open(stock_path, 'wb') as outfile_1:
-            with open(label_path, 'wb') as outfile_2:
+        with open(stock_path, 'ab') as outfile_1:
+            with open(label_path, 'ab') as outfile_2:
                 for t in tickers:
                     start_time = time.time()
                     stock, data = get_daily_data(t, False)

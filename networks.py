@@ -100,11 +100,11 @@ class DenseBlock(nn.Module):
 
 class DenseNet3(nn.Module):
     def __init__(self, depth, num_classes, growth_rate=12,
-                 reduction=0.5, bottleneck=True, dropRate=0.0):
+                 reduction=0.5, bottleneck=True, drop_rate=0.0):
         super(DenseNet3, self).__init__()
         in_planes = 2 * growth_rate
         n = (depth - 4) / 3
-        if bottleneck == True:
+        if bottleneck:
             n = n / 2
             block = BottleneckBlock
         else:
@@ -114,17 +114,17 @@ class DenseNet3(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=in_planes, kernel_size=3, stride=1,
                                padding=1, bias=False)
         # 1st block
-        self.block1 = DenseBlock(n, in_planes, growth_rate, block, dropRate)
+        self.block1 = DenseBlock(n, in_planes, growth_rate, block, drop_rate)
         in_planes = int(in_planes + n * growth_rate)
-        self.trans1 = TransitionBlock(in_planes, int(math.floor(in_planes * reduction)), dropRate=dropRate)
+        self.trans1 = TransitionBlock(in_planes, int(math.floor(in_planes * reduction)), dropRate=drop_rate)
         in_planes = int(math.floor(in_planes * reduction))
         # 2nd block
-        self.block2 = DenseBlock(n, in_planes, growth_rate, block, dropRate)
+        self.block2 = DenseBlock(n, in_planes, growth_rate, block, drop_rate)
         in_planes = int(in_planes + n * growth_rate)
-        self.trans2 = TransitionBlock(in_planes, int(math.floor(in_planes * reduction)), dropRate=dropRate)
+        self.trans2 = TransitionBlock(in_planes, int(math.floor(in_planes * reduction)), dropRate=drop_rate)
         in_planes = int(math.floor(in_planes * reduction))
         # 3rd block
-        self.block3 = DenseBlock(n, in_planes, growth_rate, block, dropRate)
+        self.block3 = DenseBlock(n, in_planes, growth_rate, block, drop_rate)
         in_planes = int(in_planes + n * growth_rate)
         # global average pooling and classifier
         self.bn1 = nn.BatchNorm2d(in_planes)
@@ -148,6 +148,6 @@ class DenseNet3(nn.Module):
         out = self.trans2(self.block2(out))
         out = self.block3(out)
         out = self.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 3)
+        out = F.avg_pool2d(out, 2)
         out = out.view(-1, self.in_planes)
         return self.fc(out)

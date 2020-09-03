@@ -32,7 +32,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = DenseNet3(depth=40, num_classes=4)  # SimpleNet(225, 450)
+            self.net = DenseNet3(depth=30, num_classes=4, bottleneck=True)  # SimpleNet(225, 450)
         self.net.cuda()
 
     def predict_signal(self, ticker):
@@ -104,7 +104,7 @@ class Model:
             plt.annotate(xy=(l, stock[l]), text=imperatives[signals[l]])
         plt.show()
 
-    def train(self, epochs):
+    def train(self):
 
         rocs_aucs = []
         baseline_rocs_aucs = []
@@ -112,41 +112,36 @@ class Model:
         accuracies = []
         data_loader, class_weights = self.data_creator.provide_training_stock()
         criterion = nn.CrossEntropyLoss()
-        optimiser = optim.AdamW(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-5, amsgrad=True)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, patience=220, min_lr=1e-9)
+        optimiser = optim.Adam(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-5, amsgrad=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.02, patience=20, min_lr=1e-9)
         self.net.train(True)
-        pbar = tqdm(total=epochs)
 
         # train the network
-        for epoch in range(epochs):
+        for i, (batch_x, batch_y) in enumerate(data_loader):
+            batch_x = batch_x.unsqueeze(1).float().cuda()
+            batch_y = batch_y.long().cuda()
 
-            for i, (batch_x, batch_y) in enumerate(data_loader):
-                batch_x = batch_x.unsqueeze(1).float().cuda()
-                batch_y = batch_y.long().cuda()
+            self.net.zero_grad()
+            output = self.net(batch_x)
+            loss = criterion(output, batch_y)
+            loss.backward()
+            optimiser.step()
 
-                self.net.zero_grad()
-                output = self.net(batch_x)
-                loss = criterion(output, batch_y)
-                loss.backward()
-                optimiser.step()
+            scheduler.step(loss.item())
 
-                scheduler.step(loss.item())
-
-                # Print some loss stats
-                if i % 2 == 0:
-                    batch_size = batch_y.size()[0]
-                    output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
-                    random_metric = relabel_data(
-                        np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
-                    label_metric = relabel_data(batch_y.detach().cpu().numpy())
-                    losses.append((loss.item()))
-                    rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
-                    baseline_rocs_aucs.append(roc_auc_score(label_metric, random_metric, multi_class='ovo'))
-                    accuracy = 100 * sum(1 if np.argmax(output_metric[k]) == np.argmax(label_metric[k]) else 0 for k in
-                                         range(batch_size)) / batch_size
-                    accuracies.append(accuracy)
-            pbar.update(1)
-        pbar.close()
+            # Print some loss stats
+            if i % 2 == 0:
+                batch_size = batch_y.size()[0]
+                output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
+                random_metric = relabel_data(
+                    np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
+                label_metric = relabel_data(batch_y.detach().cpu().numpy())
+                losses.append((loss.item()))
+                rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
+                baseline_rocs_aucs.append(roc_auc_score(label_metric, random_metric, multi_class='ovo'))
+                accuracy = 100 * sum(1 if np.argmax(output_metric[k]) == np.argmax(label_metric[k]) else 0 for k in
+                                     range(batch_size)) / batch_size
+                accuracies.append(accuracy)
         fig, axs = plt.subplots(1, 3)
         axs[0].plot(np.convolve(losses, (1 / 25) * np.ones(25), mode='valid'))
         axs[1].plot(np.convolve(rocs_aucs, (1 / 25) * np.ones(25), mode='valid'))
@@ -170,7 +165,7 @@ if __name__ == "__main__":
         except:
             print("Training started!")
         model = Model()
-        model.train(1)
+        model.train()
         model.save()
         print("Training completed!")
     else:
