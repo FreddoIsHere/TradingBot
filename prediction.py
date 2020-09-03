@@ -19,8 +19,11 @@ else:
 model = Model()
 for t in tickers:
     start_time = time.time()
-    prediction, confidence = model.predict_signal(t)
-    print("Today's recommendation for {} is: {} with a confidence of {}%".format(t, prediction, confidence))
+    try:
+        prediction, confidence = model.predict_signal(t)
+        print("Today's recommendation for {} is: {} with a confidence of {}%".format(t, prediction, confidence))
+    except:
+        print("No information on {} could be retrieved!".format(t))
     elapsed_time = time.time()
     time_to_sleep = int(13 - (elapsed_time - start_time))
     for i in range(time_to_sleep, 0, -1):  # only 5 api calls per minute allowed

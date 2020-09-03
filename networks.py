@@ -130,6 +130,7 @@ class DenseNet3(nn.Module):
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.relu = nn.ReLU(inplace=True)
         self.fc = nn.Linear(in_planes, num_classes)
+        self.softmax = nn.Softmax(dim=-1)
         self.in_planes = in_planes
 
         for m in self.modules():
@@ -150,4 +151,5 @@ class DenseNet3(nn.Module):
         out = self.relu(self.bn1(out))
         out = F.avg_pool2d(out, 2)
         out = out.view(-1, self.in_planes)
-        return self.fc(out)
+        out = self.fc(out)
+        return self.softmax(out)

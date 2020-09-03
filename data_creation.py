@@ -35,10 +35,10 @@ class DataCreator:
         class_weights = class_weights/class_weights.sum()
         weights = class_weights[signals]
         stocks = torch.from_numpy(stocks)
-        signals = torch.from_numpy(signals)
+        signals = torch.from_numpy(relabel_data(signals))
         train_set = TensorDataset(stocks.reshape(-1, 15, 15), signals)
         sampler = WeightedRandomSampler(weights=weights, num_samples=n, replacement=True)
-        return DataLoader(train_set, batch_size=self.batch_size, sampler=sampler), class_weights
+        return DataLoader(train_set, batch_size=self.batch_size, sampler=sampler), n
 
     def provide_testing_stock(self):
         stocks = []

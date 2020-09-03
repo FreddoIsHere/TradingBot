@@ -1,3 +1,6 @@
+import sys
+import time
+
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions
@@ -34,7 +37,7 @@ class Trading212:
         # Login
         self.driver.find_element_by_class_name("button-login").click()
         # Waiting and opening the user menu to avoid the 'You're using CFD' message.
-        WebDriverWait(self.driver, self.timeout).until(expected_conditions.element_to_be_clickable((By.CLASS_NAME, "account-menu-button")))
+        wait = WebDriverWait(self.driver, self.timeout).until(expected_conditions.element_to_be_clickable((By.CLASS_NAME, "account-menu-button")))
         try:
             script_click_xpath(self.driver, f"//div[@data-dojo-attach-event='click: close' and @class='close-icon']")
         except:
@@ -48,6 +51,9 @@ class Invest(Trading212):
         super().__init__(username, password, headless, Mode.Invest, long_sleep, short_sleep, timeout)
 
     def get_current_positions(self):
+        time.sleep(2)
+        script_click_xpath(self.driver, f"//span[@data-dojo-attach-event='click: onTabClick' and @class='tab-item tabpositions has-tooltip svg-icon-holder']")
+        time.sleep(2)
         list = self.driver.find_elements_by_xpath(
             f"//td[@data-column-id='name' and @class='name']/parent::tr"
         )

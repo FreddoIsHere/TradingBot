@@ -23,6 +23,7 @@ class Model:
         self.path = path
         self.data_creator = DataCreator(batch_size)
         self.learning_rate = learning_rate
+        self.batch_size = batch_size
         try:
             self.net = torch.load(self.path + "/net.pth")
             print("--------------------------------\n"
@@ -32,7 +33,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = DenseNet3(depth=30, num_classes=4, bottleneck=True)  # SimpleNet(225, 450)
+            self.net = DenseNet3(depth=40, num_classes=4, bottleneck=True)  # SimpleNet(225, 450)
         self.net.cuda()
 
     def predict_signal(self, ticker):
@@ -40,8 +41,8 @@ class Model:
         _, data = get_daily_data(ticker, compact=True)
         self.net.train(False)
         with torch.no_grad():
-            input = torch.tensor(data.to_numpy()[-1]).float().cuda()
-            output = F.softmax(self.net(input), dim=-1).cpu().numpy()
+            input = torch.tensor(data.to_numpy()[-1]).reshape(15, 15).unsqueeze(0).unsqueeze(0).float().cuda()
+            output = self.net(input).cpu().numpy().flatten()
             signal_idx = np.argmax(output)
         return signals[int(signal_idx)], 100 * output[signal_idx]
 
@@ -63,32 +64,41 @@ class Model:
 
                 output = self.net(batch_x)
                 loss = criterion(output, batch_y)
-
-                output_metric = np.argmax(F.softmax(output, dim=1).cpu().numpy(), axis=1)
-                batch_size = batch_y.size()[0]
-                batch_y = batch_y.cpu().numpy()
-                sell_mask_label = batch_y == 0
-                sell_mask_output = output_metric == 0
-                sell_accuracies.append(100 * (sell_mask_label == sell_mask_output).sum() / batch_size)
-                buy_mask_label = batch_y == 1
-                buy_mask_output = output_metric == 1
-                buy_accuracies.append(100 * (buy_mask_label == buy_mask_output).sum() / batch_size)
-                up_mask_label = batch_y == 2
-                up_mask_output = output_metric == 2
-                up_accuracies.append(100 * (up_mask_label == up_mask_output).sum() / batch_size)
-                down_mask_label = batch_y == 3
-                down_mask_output = output_metric == 3
-                down_accuracies.append(100 * (down_mask_label == down_mask_output).sum() / batch_size)
+                accuracy, buy_accuracy, sell_accuracy, up_accuracy, down_accuracy = self.log_performance(output,
+                                                                                                         batch_y)
                 losses.append((loss.item()))
-                accuracy = 100 * sum(1 if output_metric[k] == batch_y[k] else 0 for k in
-                                     range(batch_size)) / batch_size
                 accuracies.append(accuracy)
+                buy_accuracies.append(buy_accuracy)
+                sell_accuracies.append(sell_accuracy)
+                down_accuracies.append(down_accuracy)
+                up_accuracies.append(up_accuracy)
+
         print("Average loss: ", np.mean(losses))
         print("Average accuracy: ", np.mean(accuracies))
         print("Buy-Average accuracy: ", np.mean(buy_accuracies))
         print("Sell-Average accuracy: ", np.mean(sell_accuracies))
         print("Hold-Average accuracy: ", np.mean(up_accuracies))
         print("Stop-Average accuracy: ", np.mean(down_accuracies))
+
+    def log_performance(self, output, batch_y):
+        output_metric = np.argmax(output.detach().cpu().numpy(), axis=1)
+        batch_y = np.argmax(batch_y.detach().cpu().numpy(), axis=1)
+        batch_size = batch_y.size
+        sell_mask_label = batch_y == 0
+        sell_mask_output = output_metric == 0
+        sell_accuracy = 100 * (sell_mask_label == sell_mask_output).sum() / batch_size
+        buy_mask_label = batch_y == 1
+        buy_mask_output = output_metric == 1
+        buy_accuracy = 100 * (buy_mask_label == buy_mask_output).sum() / batch_size
+        up_mask_label = batch_y == 2
+        up_mask_output = output_metric == 2
+        up_accuracy = 100 * (up_mask_label == up_mask_output).sum() / batch_size
+        down_mask_label = batch_y == 3
+        down_mask_output = output_metric == 3
+        down_accuracy = 100 * (down_mask_label == down_mask_output).sum() / batch_size
+        accuracy = 100 * sum(1 if output_metric[k] == batch_y[k] else 0 for k in
+                             range(batch_size)) / batch_size
+        return accuracy, buy_accuracy, sell_accuracy, up_accuracy, down_accuracy
 
     def display_annotated_graphs(self, ticker):
         imperatives = ['SELL', 'BUY', 'HOLD', 'STOP']
@@ -106,47 +116,56 @@ class Model:
 
     def train(self):
 
-        rocs_aucs = []
-        baseline_rocs_aucs = []
         losses = []
         accuracies = []
-        data_loader, class_weights = self.data_creator.provide_training_stock()
-        criterion = nn.CrossEntropyLoss()
-        optimiser = optim.Adam(self.net.parameters(), lr=self.learning_rate, weight_decay=1e-5, amsgrad=True)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.02, patience=20, min_lr=1e-9)
+        buy_accuracies = []
+        sell_accuracies = []
+        up_accuracies = []
+        down_accuracies = []
+        data_loader, n = self.data_creator.provide_training_stock()
+        criterion = nn.MSELoss()
+        optimiser = optim.Adam(self.net.parameters(), lr=self.learning_rate)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.9, patience=50, min_lr=1e-10)
         self.net.train(True)
+        pbar = tqdm(range(int(n / self.batch_size)))
 
-        # train the network
         for i, (batch_x, batch_y) in enumerate(data_loader):
             batch_x = batch_x.unsqueeze(1).float().cuda()
-            batch_y = batch_y.long().cuda()
-
+            batch_y = batch_y.float().cuda()
             self.net.zero_grad()
             output = self.net(batch_x)
             loss = criterion(output, batch_y)
             loss.backward()
             optimiser.step()
-
             scheduler.step(loss.item())
-
-            # Print some loss stats
             if i % 2 == 0:
-                batch_size = batch_y.size()[0]
-                output_metric = F.softmax(output.detach().cpu(), dim=1).numpy()
-                random_metric = relabel_data(
-                    np.random.choice([0, 1, 2, 3], size=(1, batch_size), p=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
-                label_metric = relabel_data(batch_y.detach().cpu().numpy())
+                accuracy, buy_accuracy, sell_accuracy, up_accuracy, down_accuracy = self.log_performance(output,
+                                                                                                         batch_y)
                 losses.append((loss.item()))
-                rocs_aucs.append(roc_auc_score(label_metric, output_metric, multi_class='ovo'))
-                baseline_rocs_aucs.append(roc_auc_score(label_metric, random_metric, multi_class='ovo'))
-                accuracy = 100 * sum(1 if np.argmax(output_metric[k]) == np.argmax(label_metric[k]) else 0 for k in
-                                     range(batch_size)) / batch_size
                 accuracies.append(accuracy)
+                buy_accuracies.append(buy_accuracy)
+                sell_accuracies.append(sell_accuracy)
+                down_accuracies.append(down_accuracy)
+                up_accuracies.append(up_accuracy)
+            pbar.update(1)
+        pbar.close()
+
+        print("Average loss: ", np.mean(losses[-100:]))
+        print("Average accuracy: ", np.mean(accuracies[-100:]))
+        print("Buy-Average accuracy: ", np.mean(buy_accuracies[-100:]))
+        print("Sell-Average accuracy: ", np.mean(sell_accuracies[-100:]))
+        print("Hold-Average accuracy: ", np.mean(up_accuracies[-100:]))
+        print("Stop-Average accuracy: ", np.mean(down_accuracies[-100:]))
+        self.plot_performance_log(losses, buy_accuracies, sell_accuracies, up_accuracies, down_accuracies, accuracies)
+
+    def plot_performance_log(self, losses, buy_accuracies, sell_accuracies, up_accuracies, down_accuracies, accuracies):
         fig, axs = plt.subplots(1, 3)
         axs[0].plot(np.convolve(losses, (1 / 25) * np.ones(25), mode='valid'))
-        axs[1].plot(np.convolve(rocs_aucs, (1 / 25) * np.ones(25), mode='valid'))
-        axs[1].plot(np.convolve(baseline_rocs_aucs, (1 / 25) * np.ones(25), mode='valid'))
-        axs[1].legend(['Net', 'Baseline'])
+        axs[1].plot(np.convolve(buy_accuracies, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(sell_accuracies, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(up_accuracies, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].plot(np.convolve(down_accuracies, (1 / 25) * np.ones(25), mode='valid'))
+        axs[1].legend(['BUY', 'SELL', 'HOLD', 'STOP'])
         axs[2].plot(np.convolve(accuracies, (1 / 25) * np.ones(25), mode='valid'))
         plt.show()
 
