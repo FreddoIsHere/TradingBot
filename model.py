@@ -4,7 +4,7 @@ import torch.optim as optim
 from data_creation import DataCreator
 from networks import SimpleNet, DenseNet3
 from tqdm import tqdm
-from ralamb import Ralamb
+import optimizers as opt
 import argparse
 import os
 import matplotlib.pyplot as plt
@@ -33,7 +33,7 @@ class Model:
             print("-----------------------\n"
                   "No models were loaded! \n"
                   "-----------------------")
-            self.net = DenseNet3(depth=40, num_classes=4, bottleneck=True)  # SimpleNet(225, 450)
+            self.net = SimpleNet(225, 450) # DenseNet3(depth=40, num_classes=4, bottleneck=True, growth_rate=36, drop_rate=0.2)
         self.net.cuda()
 
     def predict_signal(self, ticker):
@@ -55,7 +55,7 @@ class Model:
         up_accuracies = []
         down_accuracies = []
         data_loader = self.data_creator.provide_testing_stock()
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.MSELoss()
         self.net.train(False)
         with torch.no_grad():
             for i, (batch_x, batch_y) in enumerate(data_loader):
@@ -124,8 +124,8 @@ class Model:
         down_accuracies = []
         data_loader, n = self.data_creator.provide_training_stock()
         criterion = nn.MSELoss()
-        optimiser = optim.Adam(self.net.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.9, patience=50, min_lr=1e-10)
+        optimiser = opt.LookaheadAdam(self.net.parameters(), lr=self.learning_rate, weight_decay=5e-5, alpha=1.0, k=3)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.7, patience=100, min_lr=1e-10)
         self.net.train(True)
         pbar = tqdm(range(int(n / self.batch_size)))
 

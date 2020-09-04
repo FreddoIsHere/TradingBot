@@ -51,7 +51,7 @@ class DataCreator:
         stocks = np.vstack(stocks)
         signals = np.hstack(signals)
         stocks = torch.from_numpy(stocks)
-        signals = torch.from_numpy(signals)
+        signals = torch.from_numpy(relabel_data(signals))
         test_set = TensorDataset(stocks.reshape(-1, 15, 15), signals)
         return DataLoader(test_set, batch_size=self.batch_size, shuffle=True)
 

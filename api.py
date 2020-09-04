@@ -51,9 +51,13 @@ class Invest(Trading212):
         super().__init__(username, password, headless, Mode.Invest, long_sleep, short_sleep, timeout)
 
     def get_current_positions(self):
-        time.sleep(2)
-        script_click_xpath(self.driver, f"//span[@data-dojo-attach-event='click: onTabClick' and @class='tab-item tabpositions has-tooltip svg-icon-holder']")
-        time.sleep(2)
+        time.sleep(5)
+        try:
+            script_click_xpath(self.driver,
+                               f"//span[@data-dojo-attach-event='click: onTabClick' and @class='tab-item tabpositions has-tooltip svg-icon-holder']")
+        except:
+            pass
+        time.sleep(5)
         list = self.driver.find_elements_by_xpath(
             f"//td[@data-column-id='name' and @class='name']/parent::tr"
         )

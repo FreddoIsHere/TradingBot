@@ -149,7 +149,7 @@ class DenseNet3(nn.Module):
         out = self.trans2(self.block2(out))
         out = self.block3(out)
         out = self.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 2)
+        out = F.max_pool2d(out, 2)
         out = out.view(-1, self.in_planes)
         out = self.fc(out)
         return self.softmax(out)
